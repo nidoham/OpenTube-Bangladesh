@@ -4,14 +4,21 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
 import com.github.opentube.ui.theme.OpenTubeTheme
+import com.github.opentube.screens.*
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -19,29 +26,83 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             OpenTubeTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                MainScreen()
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
+fun MainScreen() {
+    var selectedTab by remember { mutableStateOf(0) }
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    OpenTubeTheme {
-        Greeting("Android")
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Image(
+                        painter = painterResource(id = R.drawable.youtube_title),
+                        contentDescription = "YouTube Logo",
+                        modifier = Modifier.size(width = 120.dp, height = 60.dp), // replace with your dimensions
+                        contentScale = ContentScale.Crop // <-- centerCrop equivalent
+                    )
+                },
+
+                actions = {
+                    IconButton(onClick = { /* TODO: Search */ }) {
+                        Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.White)
+                    }
+                    IconButton(onClick = { /* TODO: Notifications */ }) {
+                        Icon(Icons.Default.Notifications, contentDescription = "Notifications", tint = Color.White)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Black,
+                    titleContentColor = Color.White
+                )
+            )
+        },
+        bottomBar = {
+            NavigationBar(containerColor = Color.Black, contentColor = Color.White) {
+                val items = listOf(
+                    Icons.Default.Home to "Home",
+                    Icons.Default.Subscriptions to "Subscription",
+                    Icons.Default.Download to "Download",
+                    Icons.Default.VideoLibrary to "Library"
+                )
+
+                items.forEachIndexed { index, pair ->
+                    NavigationBarItem(
+                        icon = { Icon(pair.first, contentDescription = pair.second) },
+                        label = { Text(pair.second) },
+                        selected = selectedTab == index,
+                        onClick = { selectedTab = index },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = Color.White,
+                            selectedTextColor = Color.White,
+                            unselectedIconColor = Color.Gray,
+                            unselectedTextColor = Color.Gray,
+                            indicatorColor = Color(0xFF282828)
+                        )
+                    )
+                }
+            }
+        },
+        containerColor = Color.Black
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .background(Color.Black)
+        ) {
+            when (selectedTab) {
+                0 -> HomeScreenCompose()
+                1 -> SubscriptionScreen()
+                2 -> DownloadScreen()
+                3 -> LibraryScreen()
+            }
+        }
     }
 }
