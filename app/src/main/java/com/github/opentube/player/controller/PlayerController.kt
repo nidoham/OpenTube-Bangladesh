@@ -126,14 +126,16 @@ class PlayerController(private val context: Context) : ViewModel() {
         val viewCount = parts.getOrNull(0)?.trim() ?: ""
         val uploadTime = parts.getOrNull(1)?.trim() ?: ""
         val subscriberCount = parts.getOrNull(2)?.trim() ?: ""
+        val channelAvatar = parts.getOrNull(3)?.trim() ?: ""
 
-        _videoMetadata.value = VideoMetadata(
+            _videoMetadata.value = VideoMetadata(
             title = title,
             channelName = channelName,
             thumbnailUrl = thumbnailUrl,
             viewCount = viewCount,
             uploadTime = uploadTime,
-            subscriberCount = subscriberCount
+            subscriberCount = subscriberCount,
+            channelAvatar = channelAvatar
         )
 
         Log.d(TAG, "Video metadata updated: $title by $channelName")

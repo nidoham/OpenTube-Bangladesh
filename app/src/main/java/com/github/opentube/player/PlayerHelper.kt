@@ -3,6 +3,9 @@ package com.github.opentube.player
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
+import com.github.opentube.player.queue.PlayQueue
+import com.github.opentube.player.queue.PlayQueueItem
+import com.github.opentube.player.queue.QueueType
 
 /**
  * Helper class providing convenient methods to start and control YouTube video playback
@@ -22,6 +25,26 @@ object PlayerHelper {
      * @param context the application or activity context required to start the service
      * @param youtubeUrl the YouTube video URL to extract and play
      */
+
+    fun playVideo(context: Context, queue: PlayQueue){
+        val type: QueueType = queue.queueType
+        val items: List<PlayQueueItem> = queue.items
+
+        if (type.equals(QueueType.NORMAL)) {
+            val item: PlayQueueItem = items.get(0)
+            playSingleVideo(context, item.videoUrl)
+        } else {
+            val urls = ArrayList<String>()
+            val startIndex: Int = 0
+            for (i in items.indices){
+                val item: PlayQueueItem = items.get(i)
+                urls.add(item.videoUrl)
+            }
+            playMultipleVideos(context, urls, startIndex)
+        }
+    }
+
+
     fun playSingleVideo(context: Context, youtubeUrl: String) {
         playMultipleVideos(context, listOf(youtubeUrl), 0)
     }

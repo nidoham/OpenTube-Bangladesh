@@ -211,7 +211,7 @@ class PlayerService : MediaSessionService() {
         val additionalInfo = "${videoInfo.views}|${videoInfo.uploaded}|$formattedSubscriberCount"
 
         val thumbnailUri = videoInfo.thumbnailUrl.toUri()
-        val avatarUrl = videoInfo.uploaderAvatar
+        val channelAvatar = videoInfo.uploaderAvatar
 
         val metadata = MediaMetadata.Builder()
             .setTitle(videoInfo.title)

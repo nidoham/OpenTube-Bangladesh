@@ -37,6 +37,10 @@
         <activity
             android:name=".error.DebugActivity"
             android:exported="true" />
+        <activity
+            android:name=".SearchActivity"
+            android:exported="false" />
+
         <service
             android:name=".player.PlayerService"
             android:exported="true"

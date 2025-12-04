@@ -21,7 +21,8 @@ data class VideoMetadata(
     val thumbnailUrl: String = "",
     val viewCount: String = "",
     val uploadTime: String = "",
-    val subscriberCount: String = ""
+    val subscriberCount: String = "",
+    val channelAvatar: String = ""
 )
 
 @Stable

@@ -1,5 +1,6 @@
 package com.github.opentube
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -15,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.github.opentube.ui.theme.OpenTubeTheme
@@ -36,6 +38,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainScreen() {
     var selectedTab by remember { mutableStateOf(0) }
+    val context = LocalContext.current   // বাংলা কমেন্ট: context উপরে নেয়া হলো
 
     Scaffold(
         topBar = {
@@ -44,25 +47,43 @@ fun MainScreen() {
                     Image(
                         painter = painterResource(id = R.drawable.youtube_title),
                         contentDescription = "YouTube Logo",
-                        modifier = Modifier.size(width = 120.dp, height = 60.dp), // replace with your dimensions
-                        contentScale = ContentScale.Crop // <-- centerCrop equivalent
+                        modifier = Modifier.size(width = 120.dp, height = 60.dp),
+                        contentScale = ContentScale.Crop
                     )
                 },
 
                 actions = {
-                    IconButton(onClick = { /* TODO: Search */ }) {
-                        Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.White)
+                    IconButton(
+                        onClick = {
+                            // বাংলা কমেন্ট: Activity ওপেন
+                            context.startActivity(
+                                Intent(context, SearchActivity::class.java)
+                            )
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = Color.White
+                        )
                     }
-                    IconButton(onClick = { /* TODO: Notifications */ }) {
-                        Icon(Icons.Default.Notifications, contentDescription = "Notifications", tint = Color.White)
+
+                    IconButton(onClick = { /* TODO */ }) {
+                        Icon(
+                            imageVector = Icons.Default.Notifications,
+                            contentDescription = "Notifications",
+                            tint = Color.White
+                        )
                     }
                 },
+
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Black,
                     titleContentColor = Color.White
                 )
             )
         },
+
         bottomBar = {
             NavigationBar(containerColor = Color.Black, contentColor = Color.White) {
                 val items = listOf(
@@ -89,6 +110,7 @@ fun MainScreen() {
                 }
             }
         },
+
         containerColor = Color.Black
     ) { innerPadding ->
         Box(

@@ -43,6 +43,7 @@ import com.github.opentube.player.PlayerHelper
 import com.github.opentube.player.controller.PlayerController
 import com.github.opentube.player.gesture.GestureHandler
 import com.github.opentube.player.manager.ControlsManager
+import com.github.opentube.player.queue.PlayQueue
 import com.github.opentube.player.util.TimeFormatter
 
 class PlayerActivity : ComponentActivity() {
@@ -55,6 +56,10 @@ class PlayerActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Log.d(TAG, "Activity onCreate called")
 
+        intent.getParcelableExtra("play_queue", PlayQueue::class.java)?.let { queue ->
+            PlayerHelper.playVideo(applicationContext, queue)
+        }
+
         setContent {
             OpenTubePlayerTheme {
                 PlayerScreen()
@@ -65,7 +70,7 @@ class PlayerActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         Log.d(TAG, "Activity onStart called")
-        PlayerHelper.playSingleVideo(applicationContext, "https://youtu.be/h7Dc4FYZ1iw?si=EhO54ZsfQBr2HRZX")
+
     }
 }
 
@@ -789,7 +794,7 @@ fun VideoMetadataSection(
         Row(verticalAlignment = Alignment.CenterVertically) {
             SubcomposeAsyncImage(
                 model = ImageRequest.Builder(context)
-                    .data(videoMetadata.thumbnailUrl.ifEmpty { null })
+                    .data(videoMetadata.channelAvatar.ifEmpty { null })
                     .crossfade(true)
                     .build(),
                 contentDescription = "Channel Avatar",
