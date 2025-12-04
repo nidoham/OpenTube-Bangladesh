@@ -54,6 +54,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation("androidx.compose.material:material-icons-extended")
 
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.0")
     implementation("io.coil-kt:coil-compose:2.4.0")
 
     implementation(libs.newpipeextractor)
@@ -70,6 +71,12 @@ dependencies {
 
     implementation(libs.rxjava)
     implementation(libs.rxandroid)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.material)
+    implementation(libs.androidx.activity)
+    implementation(libs.androidx.constraintlayout)
+
+    implementation("com.github.bumptech.glide:glide:4.16.0")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

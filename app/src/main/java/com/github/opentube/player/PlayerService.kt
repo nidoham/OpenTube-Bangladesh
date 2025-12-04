@@ -21,6 +21,7 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.github.extractor.StreamsExtractor
 import com.github.libretube.api.obj.Streams
+import com.github.opentube.PlayerActivity
 import com.github.opentube.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

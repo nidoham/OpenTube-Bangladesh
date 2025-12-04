@@ -1,5 +1,89 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
 
-    <style name="Theme.OpenTube" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- বেস অ্যাপ্লিকেশন থিম - ডার্ক থিম -->
+    <style name="Base.AppTheme" parent="Theme.Material3.Dark.NoActionBar">
+        <!-- প্রাইমারি ব্র্যান্ড কালার -->
+        <item name="colorPrimary">@color/md_theme_primary</item>
+        <item name="colorPrimaryVariant">@color/md_theme_primary_variant</item>
+        <item name="colorOnPrimary">@color/md_theme_on_primary</item>
+
+        <!-- সেকেন্ডারি কালার -->
+        <item name="colorSecondary">@color/md_theme_secondary</item>
+        <item name="colorSecondaryVariant">@color/md_theme_secondary_variant</item>
+        <item name="colorOnSecondary">@color/md_theme_on_secondary</item>
+
+        <!-- ব্যাকগ্রাউন্ড কালার -->
+        <item name="android:colorBackground">@color/md_theme_background</item>
+        <item name="colorOnBackground">@color/md_theme_on_background</item>
+
+        <!-- সারফেস কালার -->
+        <item name="colorSurface">@color/md_theme_surface</item>
+        <item name="colorOnSurface">@color/md_theme_on_surface</item>
+        <item name="colorOnSurfaceVariant">@color/md_theme_on_surface_variant</item>
+
+        <!-- স্ট্যাটাস বার -->
+        <item name="android:statusBarColor">@color/md_theme_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+
+        <!-- নেভিগেশন বার -->
+        <item name="android:navigationBarColor">@color/md_theme_navigation_background</item>
+        <item name="android:windowLightNavigationBar">false</item>
+
+        <!-- এরর কালার -->
+        <item name="colorError">@color/md_theme_error</item>
+
+        <!-- উইন্ডো ব্যাকগ্রাউন্ড -->
+        <item name="android:windowBackground">@color/md_theme_background</item>
+
+        <!-- টেক্সট কালার -->
+        <item name="android:textColorPrimary">@color/md_theme_text_primary</item>
+        <item name="android:textColorSecondary">@color/md_theme_text_secondary</item>
+        <item name="android:textColorTertiary">@color/md_theme_text_tertiary</item>
+        <item name="android:textColorHint">@color/md_theme_text_tertiary</item>
+
+        <!-- ডিভাইডার -->
+        <item name="android:listDivider">@color/md_theme_divider</item>
+
+        <!-- রিপল ইফেক্ট -->
+        <item name="android:colorControlHighlight">@color/md_theme_ripple</item>
+    </style>
+
+    <!-- মেইন অ্যাপ্লিকেশন থিম -->
+    <style name="AppTheme" parent="Base.AppTheme" />
+
+    <!-- ডায়ালগ থিম ওভারলে -->
+    <style name="ThemeOverlay.App.Dialog" parent="ThemeOverlay.Material3.Dialog">
+        <item name="android:background">@color/md_theme_surface_elevated</item>
+        <item name="colorSurface">@color/md_theme_surface_elevated</item>
+        <item name="android:textColorPrimary">@color/md_theme_text_primary</item>
+        <item name="android:textColorSecondary">@color/md_theme_text_secondary</item>
+    </style>
+
+    <!-- বটম শিট ডায়ালগ থিম -->
+    <style name="ThemeOverlay.App.BottomSheet" parent="ThemeOverlay.Material3.BottomSheetDialog">
+        <item name="android:background">@color/md_theme_surface_elevated</item>
+        <item name="colorSurface">@color/md_theme_surface_elevated</item>
+        <item name="android:textColorPrimary">@color/md_theme_text_primary</item>
+    </style>
+
+    <!-- ফুল স্ক্রিন ভিডিও প্লেয়ার থিম -->
+    <style name="AppTheme.Fullscreen" parent="AppTheme">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowBackground">@color/md_theme_player_background</item>
+    </style>
+
+    <!-- স্প্ল্যাশ স্ক্রিন থিম -->
+    <style name="AppTheme.Splash" parent="AppTheme">
+        <item name="android:windowBackground">@color/md_theme_background</item>
+        <item name="android:statusBarColor">@color/md_theme_background</item>
+    </style>
+
+    <!-- Circle Image Style for Channel Avatars -->
+    <style name="CircleImage">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+
 </resources>

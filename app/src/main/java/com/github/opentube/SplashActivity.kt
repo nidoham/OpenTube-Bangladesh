@@ -17,13 +17,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.github.opentube.player.PlayerActivity
 import kotlinx.coroutines.delay
-import com.github.opentube.player.PlayerHelper
 
 class SplashActivity : ComponentActivity() {
     @RequiresApi(Build.VERSION_CODES.ECLAIR)
@@ -32,7 +29,7 @@ class SplashActivity : ComponentActivity() {
         setContent {
             OpenTubeSplashTheme {
                 SplashScreen {
-                    startActivity(Intent(this, PlayerActivity::class.java))
+                    startActivity(Intent(this, MainActivity::class.java))
                     overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
                     finish()
                 }
