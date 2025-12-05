@@ -17,7 +17,7 @@ data class StreamInfo(
     val videoUrl: String
 ) {
     companion object {
-        // ⭐ StreamInfoItem → StreamInfo কনভার্ট
+        // StreamInfoItem → StreamInfo
         fun from(item: StreamInfoItem): StreamInfo {
             return StreamInfo(
                 id = item.url ?: "",
@@ -27,17 +27,28 @@ data class StreamInfo(
                 thumbnails = item.thumbnails,
                 duration = item.duration,
                 viewCount = item.viewCount,
-                uploadDate = try { item.textualUploadDate ?: "" } catch (e: Exception) { "" },
+                uploadDate = try {
+                    item.textualUploadDate ?: ""
+                } catch (e: Exception) {
+                    ""
+                },
                 videoUrl = item.url ?: ""
             )
         }
 
+        // Streams → StreamInfo
         fun from(item: Streams): StreamInfo {
+            val avatars: List<Image>? = when (val anyAvatar = item.uploaderAvatar) {
+                is List<*> -> anyAvatar.filterIsInstance<Image>()
+                is Image -> listOf(anyAvatar)
+                else -> null
+            }
+
             return StreamInfo(
                 id = "youtube",
                 title = item.title ?: "No Title",
                 uploaderName = item.uploader ?: "Unknown",
-                uploaderAvatars = item.uploaderAvatar as List<Image>?,
+                uploaderAvatars = avatars,
                 thumbnails = emptyList(),
                 duration = item.duration,
                 viewCount = item.views,
@@ -47,12 +58,12 @@ data class StreamInfo(
         }
     }
 
-    // ⭐ ভিডিওর সেরা থাম্বনেইল URL
+    // ভিডিওর সেরা থাম্বনেইল URL
     fun bestThumbnailUrl(): String? = ImageBitmap.thumbnails(thumbnails)
 
-    // ⭐ চ্যানেলের সেরা অ্যাভাটার URL
+    // চ্যানেলের সেরা অ্যাভাটার URL
     fun bestUploaderAvatarUrl(): String? = ImageBitmap.thumbnails(uploaderAvatars)
 
-    // ⭐ যেকোনো ইমেজ লিস্ট থেকে সেরা URL
+    // যেকোনো ইমেজ লিস্ট থেকে সেরা URL
     fun bestImageUrl(list: List<Image>?): String? = ImageBitmap.thumbnails(list)
 }

@@ -12,6 +12,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+/**
+ * Manages player controls UI state including auto-hide, overlays, brightness, and quality selection.
+ * Designed for Jetpack Compose video player with gesture-based controls.
+ */
 class ControlsManager(private val context: Context) : ViewModel() {
 
     private val _controlsState = mutableStateOf(ControlsState())
@@ -29,24 +33,35 @@ class ControlsManager(private val context: Context) : ViewModel() {
         initializeBrightness()
     }
 
+    /**
+     * Initializes brightness from system settings or window attributes.
+     */
     private fun initializeBrightness() {
-        val activity = context as? Activity
-        val brightness = activity?.window?.attributes?.screenBrightness?.takeIf { it >= 0f }
-            ?: try {
-                Settings.System.getInt(
-                    context.contentResolver,
-                    Settings.System.SCREEN_BRIGHTNESS
-                ) / 255f
-            } catch (e: Exception) {
-                0.5f
+        val brightness = when (val activity = context as? Activity) {
+            null -> 0.5f
+            else -> {
+                activity.window?.attributes?.screenBrightness?.takeIf { it >= 0f }
+                    ?: try {
+                        Settings.System.getFloat(
+                            context.contentResolver,
+                            Settings.System.SCREEN_BRIGHTNESS,
+                            128f
+                        ) / 255f
+                    } catch (e: Exception) {
+                        0.5f
+                    }
             }
-
+        }
         _controlsState.value = _controlsState.value.copy(brightness = brightness)
     }
 
+    /**
+     * Toggles controls visibility and manages auto-hide timer.
+     */
     fun toggleControls() {
-        val newState = !_controlsState.value.showControls
-        _controlsState.value = _controlsState.value.copy(showControls = newState)
+        val currentState = _controlsState.value
+        val newState = !currentState.showControls
+        _controlsState.value = currentState.copy(showControls = newState)
 
         if (newState) {
             scheduleAutoHide()
@@ -55,90 +70,159 @@ class ControlsManager(private val context: Context) : ViewModel() {
         }
     }
 
+    /**
+     * Shows controls and starts auto-hide timer.
+     */
     fun showControls() {
-        _controlsState.value = _controlsState.value.copy(showControls = true)
+        val currentState = _controlsState.value
+        _controlsState.value = currentState.copy(showControls = true)
         scheduleAutoHide()
     }
 
+    /**
+     * Hides controls and cancels auto-hide timer.
+     */
     fun hideControls() {
-        _controlsState.value = _controlsState.value.copy(showControls = false)
+        val currentState = _controlsState.value
+        _controlsState.value = currentState.copy(showControls = false)
         cancelAutoHide()
     }
 
+    /**
+     * Schedules controls to auto-hide after delay.
+     */
     private fun scheduleAutoHide() {
         cancelAutoHide()
         autoHideJob = viewModelScope.launch {
             delay(AUTO_HIDE_DELAY)
-            _controlsState.value = _controlsState.value.copy(showControls = false)
+            val currentState = _controlsState.value
+            if (currentState.showControls) {
+                _controlsState.value = currentState.copy(showControls = false)
+            }
         }
     }
 
+    /**
+     * Cancels auto-hide timer.
+     */
     private fun cancelAutoHide() {
         autoHideJob?.cancel()
         autoHideJob = null
     }
 
+    /**
+     * Shows seek preview overlay with direction indicator.
+     * @param direction Positive for forward, negative for backward seek
+     */
     fun showSeekOverlay(direction: Int) {
-        _controlsState.value = _controlsState.value.copy(
+        val currentState = _controlsState.value
+        _controlsState.value = currentState.copy(
             showSeekOverlay = true,
             seekDirection = direction
         )
 
         viewModelScope.launch {
             delay(SEEK_OVERLAY_DURATION)
-            _controlsState.value = _controlsState.value.copy(showSeekOverlay = false)
+            val state = _controlsState.value
+            if (state.showSeekOverlay) {
+                _controlsState.value = state.copy(showSeekOverlay = false)
+            }
         }
     }
 
+    /**
+     * Shows volume overlay (hides other controls).
+     */
     fun showVolumeOverlay() {
         hideControls()
-        _controlsState.value = _controlsState.value.copy(showVolumeOverlay = true)
+        val currentState = _controlsState.value
+        _controlsState.value = currentState.copy(showVolumeOverlay = true)
     }
 
+    /**
+     * Hides volume overlay after delay.
+     */
     fun hideVolumeOverlay() {
         viewModelScope.launch {
             delay(OVERLAY_HIDE_DELAY)
-            _controlsState.value = _controlsState.value.copy(showVolumeOverlay = false)
+            val state = _controlsState.value
+            if (state.showVolumeOverlay) {
+                _controlsState.value = state.copy(showVolumeOverlay = false)
+            }
         }
     }
 
+    /**
+     * Shows brightness overlay (hides other controls).
+     */
     fun showBrightnessOverlay() {
         hideControls()
-        _controlsState.value = _controlsState.value.copy(showBrightnessOverlay = true)
+        val currentState = _controlsState.value
+        _controlsState.value = currentState.copy(showBrightnessOverlay = true)
     }
 
+    /**
+     * Hides brightness overlay after delay.
+     */
     fun hideBrightnessOverlay() {
         viewModelScope.launch {
             delay(OVERLAY_HIDE_DELAY)
-            _controlsState.value = _controlsState.value.copy(showBrightnessOverlay = false)
+            val state = _controlsState.value
+            if (state.showBrightnessOverlay) {
+                _controlsState.value = state.copy(showBrightnessOverlay = false)
+            }
         }
     }
 
+    /**
+     * Sets brightness value and applies to window.
+     * @param brightness Value between 0.0f and 1.0f
+     */
     fun setBrightness(brightness: Float) {
-        val clampedBrightness = brightness.coerceIn(0f, 1f)
-        _controlsState.value = _controlsState.value.copy(brightness = clampedBrightness)
+        val clamped = brightness.coerceIn(0f, 1f)
+        val currentState = _controlsState.value
+        _controlsState.value = currentState.copy(brightness = clamped)
 
         val activity = context as? Activity
-        val layoutParams = activity?.window?.attributes
-        layoutParams?.screenBrightness = clampedBrightness
-        activity?.window?.attributes = layoutParams
+        activity?.window?.let { window ->
+            val layoutParams = window.attributes
+            layoutParams.screenBrightness = clamped
+            window.attributes = layoutParams
+        }
     }
 
+    /**
+     * Adjusts brightness by delta amount.
+     * @param delta Positive or negative adjustment value
+     */
     fun adjustBrightness(delta: Float) {
-        val newBrightness = (_controlsState.value.brightness + delta).coerceIn(0f, 1f)
-        setBrightness(newBrightness)
+        val currentBrightness = _controlsState.value.brightness
+        setBrightness(currentBrightness + delta)
     }
 
+    /**
+     * Shows quality selection dialog.
+     */
     fun showQualityDialog() {
-        _controlsState.value = _controlsState.value.copy(showQualityDialog = true)
+        val currentState = _controlsState.value
+        _controlsState.value = currentState.copy(showQualityDialog = true)
     }
 
+    /**
+     * Hides quality selection dialog.
+     */
     fun hideQualityDialog() {
-        _controlsState.value = _controlsState.value.copy(showQualityDialog = false)
+        val currentState = _controlsState.value
+        _controlsState.value = currentState.copy(showQualityDialog = false)
     }
 
+    /**
+     * Sets selected quality and hides dialog.
+     * @param quality Quality string (e.g., "1080p", "720p60")
+     */
     fun setQuality(quality: String) {
-        _controlsState.value = _controlsState.value.copy(quality = quality)
+        val currentState = _controlsState.value
+        _controlsState.value = currentState.copy(quality = quality)
         hideQualityDialog()
     }
 

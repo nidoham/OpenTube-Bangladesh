@@ -3,10 +3,12 @@ package com.github.opentube
 import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -52,6 +54,7 @@ class PlayerActivity : ComponentActivity() {
         private const val TAG = "PlayerActivity"
     }
 
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.d(TAG, "Activity onCreate called")
@@ -70,7 +73,6 @@ class PlayerActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         Log.d(TAG, "Activity onStart called")
-
     }
 }
 
@@ -319,7 +321,10 @@ fun GestureLayer(
                             onDragEnd = { controlsManager.hideBrightnessOverlay() }
                         ) { change, dragAmount ->
                             change.consume()
-                            gestureHandler.handleBrightnessDrag(dragAmount)
+                            gestureHandler.handleBrightnessDrag(
+                                dragAmount = dragAmount,
+                                screenHeight = size.height.toFloat()
+                            )
                         }
                     }
             )
@@ -336,7 +341,10 @@ fun GestureLayer(
                             onDragEnd = { controlsManager.hideVolumeOverlay() }
                         ) { change, dragAmount ->
                             change.consume()
-                            gestureHandler.handleVolumeDrag(dragAmount)
+                            gestureHandler.handleVolumeDrag(
+                                dragAmount = dragAmount,
+                                screenHeight = size.height.toFloat()
+                            )
                         }
                     }
             )
@@ -495,7 +503,9 @@ fun TopControls(
                 color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).padding(horizontal = 16.dp)
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 16.dp)
             )
         } else {
             Spacer(modifier = Modifier.weight(1f))
@@ -535,7 +545,12 @@ fun CenterControls(
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onPrevious) {
-            Icon(Icons.Default.SkipPrevious, "Previous", tint = Color.White, modifier = Modifier.size(40.dp))
+            Icon(
+                Icons.Default.SkipPrevious,
+                "Previous",
+                tint = Color.White,
+                modifier = Modifier.size(40.dp)
+            )
         }
 
         Box(
@@ -555,7 +570,12 @@ fun CenterControls(
         }
 
         IconButton(onClick = onNext) {
-            Icon(Icons.Default.SkipNext, "Next", tint = Color.White, modifier = Modifier.size(40.dp))
+            Icon(
+                Icons.Default.SkipNext,
+                "Next",
+                tint = Color.White,
+                modifier = Modifier.size(40.dp)
+            )
         }
     }
 }
@@ -748,8 +768,16 @@ fun QualityDialog(
         modifier = Modifier.width(250.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Select Quality", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Divider(color = Color.Gray.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 12.dp))
+            Text(
+                "Select Quality",
+                color = Color.White,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Divider(
+                color = Color.Gray.copy(alpha = 0.3f),
+                modifier = Modifier.padding(vertical = 12.dp)
+            )
             listOf("Auto", "1080p", "720p", "480p", "360p").forEach { q ->
                 Row(
                     modifier = Modifier
@@ -760,7 +788,12 @@ fun QualityDialog(
                 ) {
                     Text(q, color = Color.White)
                     if (q == currentQuality) {
-                        Icon(Icons.Default.Check, null, tint = Color.Red, modifier = Modifier.size(20.dp))
+                        Icon(
+                            Icons.Default.Check,
+                            null,
+                            tint = Color.Red,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
             }
@@ -805,7 +838,9 @@ fun VideoMetadataSection(
                 contentScale = ContentScale.Crop,
                 loading = {
                     Box(
-                        modifier = Modifier.fillMaxSize().background(Color.DarkGray),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.DarkGray),
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator(
@@ -817,7 +852,9 @@ fun VideoMetadataSection(
                 },
                 error = {
                     Box(
-                        modifier = Modifier.fillMaxSize().background(Color.DarkGray),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.DarkGray),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(

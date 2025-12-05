@@ -18,48 +18,43 @@ import com.github.opentube.player.queue.QueueType
 object PlayerHelper {
 
     /**
-     * Initiates playback of a single YouTube video URL by starting the PlayerService with
-     * the appropriate configuration. This method handles service startup and passes the
-     * necessary data for video extraction and playback initialization.
+     * Initiates playback of videos from a PlayQueue. Handles both single video and playlist scenarios.
      *
-     * @param context the application or activity context required to start the service
-     * @param youtubeUrl the YouTube video URL to extract and play
+     * @param context Application or activity context
+     * @param queue The play queue containing videos to play
      */
+    fun playVideo(context: Context, queue: PlayQueue) {
+        val type = queue.queueType
+        val items = queue.items
 
-    fun playVideo(context: Context, queue: PlayQueue){
-        val type: QueueType = queue.queueType
-        val items: List<PlayQueueItem> = queue.items
-
-        if (type.equals(QueueType.NORMAL)) {
-            val item: PlayQueueItem = items.get(0)
-            playSingleVideo(context, item.videoUrl)
-        } else {
-            val urls = ArrayList<String>()
-            val startIndex: Int = 0
-            for (i in items.indices){
-                val item: PlayQueueItem = items.get(i)
-                urls.add(item.videoUrl)
+        when (type) {
+            QueueType.NORMAL -> {
+                val firstItem = items.firstOrNull()
+                firstItem?.let { playSingleVideo(context, it.videoUrl) }
             }
-            playMultipleVideos(context, urls, startIndex)
+            else -> {
+                val urls = items.map { it.videoUrl }
+                playMultipleVideos(context, urls, 0)
+            }
         }
     }
 
-
+    /**
+     * Plays a single YouTube video.
+     *
+     * @param context Application or activity context
+     * @param youtubeUrl YouTube video URL to play
+     */
     fun playSingleVideo(context: Context, youtubeUrl: String) {
         playMultipleVideos(context, listOf(youtubeUrl), 0)
     }
 
     /**
-     * Initiates playback of multiple YouTube videos as a playlist by starting the PlayerService
-     * with the complete list of URLs and the desired starting position. The service will process
-     * each URL sequentially to extract stream information and build a playable queue.
+     * Plays multiple YouTube videos as a playlist.
      *
-     * This method is ideal for playlist playback scenarios where users want to queue multiple
-     * videos for continuous playback without manual intervention between videos.
-     *
-     * @param context the application or activity context required to start the service
-     * @param youtubeUrls list of YouTube video URLs to extract and play in sequence
-     * @param startIndex the zero-based index indicating which video to start playing first
+     * @param context Application or activity context
+     * @param youtubeUrls List of YouTube video URLs
+     * @param startIndex Index of first video to play (default: 0)
      */
     fun playMultipleVideos(context: Context, youtubeUrls: List<String>, startIndex: Int = 0) {
         val intent = Intent(context, PlayerService::class.java).apply {
@@ -67,16 +62,13 @@ object PlayerHelper {
             putStringArrayListExtra(PlayerService.EXTRA_YOUTUBE_URLS, ArrayList(youtubeUrls))
             putExtra(PlayerService.EXTRA_START_INDEX, startIndex)
         }
-
         ContextCompat.startForegroundService(context, intent)
     }
 
     /**
-     * Stops the PlayerService and ends all active playback sessions. This method should be
-     * called when the user explicitly wants to stop playback and terminate the background
-     * service completely.
+     * Stops all playback and terminates the PlayerService.
      *
-     * @param context the application or activity context required to stop the service
+     * @param context Application or activity context
      */
     fun stopPlayback(context: Context) {
         val intent = Intent(context, PlayerService::class.java)
@@ -85,18 +77,14 @@ object PlayerHelper {
 }
 
 /**
- * Extension function for Context to provide a more idiomatic way to play YouTube videos
- * directly from any context instance. This simplifies the calling code and provides a
- * cleaner API surface for initiating playback.
+ * Extension function: Play a single YouTube video from any Context.
  */
 fun Context.playYoutubeVideo(url: String) {
     PlayerHelper.playSingleVideo(this, url)
 }
 
 /**
- * Extension function for Context to play multiple YouTube videos as a playlist with an
- * optional starting index. This provides an intuitive way to start playlist playback
- * from any context without directly interacting with the PlayerHelper object.
+ * Extension function: Play YouTube playlist from any Context.
  */
 fun Context.playYoutubePlaylist(urls: List<String>, startIndex: Int = 0) {
     PlayerHelper.playMultipleVideos(this, urls, startIndex)
