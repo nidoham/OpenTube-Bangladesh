@@ -5,6 +5,8 @@ import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import org.schabi.newpipe.extractor.stream.AudioStream
+import org.schabi.newpipe.extractor.stream.VideoStream
 import java.time.Instant
 
 @Serializable
@@ -34,8 +36,8 @@ data class Streams(
     val views: Long = 0,
     val likes: Long = 0,
     val dislikes: Long = 0,
-    val audioStreams: List<PipedStream> = emptyList(),
-    val videoStreams: List<PipedStream> = emptyList(),
+    val audioStreams: List<AudioStream> = emptyList(),
+    val videoStreams: List<VideoStream> = emptyList(),
     var relatedStreams: List<StreamItem> = emptyList(),
     val subtitles: List<Subtitle> = emptyList(),
     val livestream: Boolean = false,

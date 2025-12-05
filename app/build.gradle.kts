@@ -90,6 +90,8 @@ dependencies {
     // Glide (extra image loading, যদি দরকার হয়)
     implementation("com.github.bumptech.glide:glide:4.16.0")
 
+    implementation("com.google.guava:guava:33.3.0-android")
+
     // Tests
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
