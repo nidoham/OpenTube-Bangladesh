@@ -1,6 +1,7 @@
 package com.github.extractor.stream
 
 import com.github.extractor.image.ImageBitmap
+import com.github.libretube.api.obj.Streams
 import org.schabi.newpipe.extractor.Image
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 
@@ -28,6 +29,20 @@ data class StreamInfo(
                 viewCount = item.viewCount,
                 uploadDate = try { item.textualUploadDate ?: "" } catch (e: Exception) { "" },
                 videoUrl = item.url ?: ""
+            )
+        }
+
+        fun from(item: Streams): StreamInfo {
+            return StreamInfo(
+                id = "youtube",
+                title = item.title ?: "No Title",
+                uploaderName = item.uploader ?: "Unknown",
+                uploaderAvatars = item.uploaderAvatar as List<Image>?,
+                thumbnails = emptyList(),
+                duration = item.duration,
+                viewCount = item.views,
+                uploadDate = "",
+                videoUrl = item.proxyUrl ?: ""
             )
         }
     }

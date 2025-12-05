@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -51,7 +52,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.schabi.newpipe.extractor.Image
 import org.schabi.newpipe.extractor.NewPipe
+import org.schabi.newpipe.extractor.Page
 import org.schabi.newpipe.extractor.ServiceList
+import org.schabi.newpipe.extractor.search.SearchExtractor
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 
 // Dark color scheme with pure black background
@@ -95,11 +98,20 @@ class SearchViewModel : ViewModel() {
     var searchQuery by mutableStateOf("")
     var searchResults by mutableStateOf<List<StreamInfo>>(emptyList())
     var searchSuggestions by mutableStateOf<List<String>>(emptyList())
+
+    // State for initial loading
     var isLoading by mutableStateOf(false)
+    // State for pagination loading
+    var isLoadingMore by mutableStateOf(false)
+
     var showSuggestions by mutableStateOf(false)
 
     private var suggestionJob: Job? = null
     private val serviceId = ServiceList.YouTube.serviceId
+
+    // Pagination variables
+    private var currentExtractor: SearchExtractor? = null
+    private var nextPageInfo: Page? = null
 
     fun updateSearchQuery(query: String) {
         searchQuery = query
@@ -143,12 +155,20 @@ class SearchViewModel : ViewModel() {
         isLoading = true
         searchResults = emptyList()
 
+        // Reset pagination state
+        currentExtractor = null
+        nextPageInfo = null
+
         viewModelScope.launch {
             val results = withContext(Dispatchers.IO) {
                 try {
                     val service = NewPipe.getService(serviceId)
                     val extractor = service.getSearchExtractor(query)
                     extractor.fetchPage()
+
+                    // Save extractor and next page info for pagination
+                    currentExtractor = extractor
+                    nextPageInfo = extractor.initialPage.nextPage
 
                     val items = extractor.initialPage.items
 
@@ -167,11 +187,47 @@ class SearchViewModel : ViewModel() {
         }
     }
 
+    fun loadNextPage() {
+        // Prevent multiple calls or calls when there are no more pages
+        if (isLoadingMore || nextPageInfo == null || currentExtractor == null) return
+
+        isLoadingMore = true
+
+        viewModelScope.launch {
+            val newResults = withContext(Dispatchers.IO) {
+                try {
+                    // Fetch the next page using the stored info
+                    val page = currentExtractor!!.getPage(nextPageInfo)
+
+                    // Update next page info for the subsequent call
+                    nextPageInfo = page.nextPage
+
+                    val items = page.items
+                    items.filterIsInstance<StreamInfoItem>()
+                        .map { item ->
+                            StreamInfo.from(item)
+                        }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    emptyList<StreamInfo>()
+                }
+            }
+
+            // Append new results to the existing list
+            if (newResults.isNotEmpty()) {
+                searchResults = searchResults + newResults
+            }
+            isLoadingMore = false
+        }
+    }
+
     fun clearSearch() {
         searchQuery = ""
         searchResults = emptyList()
         searchSuggestions = emptyList()
         showSuggestions = false
+        currentExtractor = null
+        nextPageInfo = null
     }
 }
 
@@ -215,6 +271,7 @@ fun SearchScreen(
                 val context = LocalContext.current
                 SearchResultsList(
                     results = viewModel.searchResults,
+                    isLoadingMore = viewModel.isLoadingMore,
                     onVideoClick = { stream ->
                         val item = PlayQueueItem(
                             title = stream.title,
@@ -229,11 +286,14 @@ fun SearchScreen(
                             putExtra("play_queue", queue)
                         }
                         context.startActivity(intent)
+                    },
+                    onLoadMore = {
+                        viewModel.loadNextPage()
                     }
                 )
             }
 
-            // Loading Indicator
+            // Initial Loading Indicator
             if (viewModel.isLoading) {
                 CircularProgressIndicator(
                     modifier = Modifier.align(Alignment.Center),
@@ -411,17 +471,49 @@ fun SuggestionItem(
 @Composable
 fun SearchResultsList(
     results: List<StreamInfo>,
-    onVideoClick: (StreamInfo) -> Unit
+    isLoadingMore: Boolean,
+    onVideoClick: (StreamInfo) -> Unit,
+    onLoadMore: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.background(Color.Black),
-        contentPadding = PaddingValues(8.dp)
+        contentPadding = PaddingValues(
+            top = 8.dp,
+            start = 8.dp,
+            end = 8.dp,
+            bottom = 24.dp
+        )
     ) {
-        items(results) { video ->
+        itemsIndexed(results) { index, video ->
             VideoItemCard(
                 streamInfo = video,
                 onClick = { onVideoClick(video) }
             )
+
+            // Check if we reached the end of the list
+            if (index == results.lastIndex && !isLoadingMore) {
+                LaunchedEffect(Unit) {
+                    onLoadMore()
+                }
+            }
+        }
+
+        // Loading indicator at the bottom
+        if (isLoadingMore) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(32.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 3.dp
+                    )
+                }
+            }
         }
     }
 }
