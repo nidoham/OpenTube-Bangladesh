@@ -23,16 +23,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.github.extractor.stream.StreamInfo
-import org.schabi.newpipe.extractor.Image
+import com.github.extractor.stream.StreamInfoItem
+import com.github.opentube.formatDuration
+import com.github.opentube.formatViewCount
 
 @Composable
 fun VideoRecommendationItem(
-    streamInfo: StreamInfo,
+    streamInfo: StreamInfoItem,
     onVideoClick: () -> Unit = {}
 ) {
-    val thumbnails: String = streamInfo.bestThumbnailUrl() ?: ""
-    val channelAvatars= streamInfo.bestUploaderAvatarUrl() ?: ""
+    val thumbnailUrl: String = streamInfo.thumbnails.firstOrNull()?.url ?: ""
+    val channelAvatarUrl: String = streamInfo.uploaderAvatars.firstOrNull()?.url ?: ""
 
     Column(
         modifier = Modifier
@@ -40,6 +41,7 @@ fun VideoRecommendationItem(
             .clickable { onVideoClick() }
             .padding(bottom = 16.dp)
     ) {
+        // Thumbnail
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -47,10 +49,10 @@ fun VideoRecommendationItem(
                 .clip(RoundedCornerShape(8.dp))
                 .background(Color(0xFF1E1E1E))
         ) {
-            if (!thumbnails.isNullOrEmpty()) {
+            if (thumbnailUrl.isNotEmpty()) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
-                        .data(thumbnails)
+                        .data(thumbnailUrl)
                         .crossfade(true)
                         .build(),
                     contentDescription = "Video Thumbnail",
@@ -62,29 +64,33 @@ fun VideoRecommendationItem(
                     imageVector = Icons.Default.AccountCircle,
                     contentDescription = "Default Thumbnail",
                     tint = Color.DarkGray,
-                    modifier = Modifier.size(48.dp).align(Alignment.Center)
+                    modifier = Modifier
+                        .size(48.dp)
+                        .align(Alignment.Center)
                 )
             }
         }
 
         Spacer(modifier = Modifier.height(10.dp))
 
+        // Info row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.Top
         ) {
+            // Channel avatar
             Box(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
                     .background(Color(0xFF272727))
             ) {
-                if (!channelAvatars.isNullOrEmpty()) {
+                if (channelAvatarUrl.isNotEmpty()) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
-                            .data(channelAvatars)
+                            .data(channelAvatarUrl)
                             .crossfade(true)
                             .build(),
                         contentDescription = "Channel Avatar",
@@ -96,35 +102,67 @@ fun VideoRecommendationItem(
                         imageVector = Icons.Default.AccountCircle,
                         contentDescription = "Default Channel Avatar",
                         tint = Color.LightGray,
-                        modifier = Modifier.padding(4.dp).fillMaxSize()
+                        modifier = Modifier
+                            .padding(4.dp)
+                            .fillMaxSize()
                     )
                 }
             }
 
             Spacer(modifier = Modifier.width(12.dp))
 
+            // Texts
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = streamInfo.title,
+                    text = streamInfo.name,
                     color = Color.White,
                     fontSize = 16.sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     lineHeight = 20.sp
                 )
+
                 Spacer(modifier = Modifier.height(4.dp))
+
                 Text(
-                    text = streamInfo.uploadDate,
+                    text = streamInfo.uploaderName,
                     color = Color.Gray,
                     fontSize = 13.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                val viewsText = if (streamInfo.viewCount >= 0) {
+                    "${formatViewCount(streamInfo.viewCount)} views"
+                } else {
+                    ""
+                }
+
+                val dateText = streamInfo.textualUploadDate.ifBlank {
+                    streamInfo.uploadDate?: ""
+                }
+
+                val metaText = listOf(viewsText, dateText)
+                    .joinToString(" • ")
+
+                if (metaText.isNotBlank()) {
+                    Text(
+                        text = metaText,
+                        color = Color.Gray,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
 
             IconButton(
-                onClick = { },
-                modifier = Modifier.size(32.dp).align(Alignment.Top)
+                onClick = { /* TODO: show options */ },
+                modifier = Modifier
+                    .size(32.dp)
+                    .align(Alignment.Top)
             ) {
                 Icon(
                     imageVector = Icons.Default.MoreVert,

@@ -1,6 +1,7 @@
 package com.github.opentube.player.state
 
 import androidx.compose.runtime.Stable
+import com.github.opentube.player.util.TimeFormatter  // ✅ Add import
 
 /**
  * Player playback state for UI reactivity.
@@ -32,8 +33,11 @@ data class PlayerState(
     /** Connection or playback error occurred */
     val hasError: Boolean = false
 ) {
-    /** Progress as fraction (0.0 - 1.0) for seekbar */
-    val progress: Float = if (duration > 0L) currentPosition.toFloat() / duration else 0f
+    /** Progress as fraction (0.0 - 1.0) for seekbar - SAFE */
+    val progress: Float
+        get() = if (duration > 0L) {
+            (currentPosition.coerceAtMost(duration) / duration.toFloat()).coerceIn(0f, 1f)
+        } else 0f
 
     /** Formatted position string for display */
     val formattedPosition: String get() = formatDuration(currentPosition)
@@ -45,37 +49,7 @@ data class PlayerState(
     val isReady: Boolean get() = isConnected && !isConnecting && !hasError
 }
 
-/**
- * Video metadata extracted from YouTube streams.
- * Populated by PlayerService from NewPipe extractor.
- */
-@Stable
-data class VideoMetadata(
-    /** Video title */
-    val title: String = "Loading...",
-
-    /** Channel/uploader name */
-    val channelName: String = "",
-
-    /** Primary thumbnail URL */
-    val thumbnailUrl: String = "",
-
-    /** Formatted view count (e.g., "1.2M views") */
-    val viewCount: String = "",
-
-    /** Upload time (e.g., "2 days ago") */
-    val uploadTime: String = "",
-
-    /** Formatted subscriber count (e.g., "1.2M subscribers") */
-    val subscriberCount: String = "",
-
-    /** Channel avatar URL */
-    val channelAvatar: String = ""
-)
-
-/**
- * Player controls UI state for overlays and dialogs.
- */
+/** Player controls UI state for overlays and dialogs. */
 @Stable
 data class ControlsState(
     /** Main controls bar visibility */
@@ -107,9 +81,7 @@ data class ControlsState(
         get() = showVolumeOverlay || showBrightnessOverlay || showSeekOverlay || showQualityDialog
 }
 
-/**
- * Screen orientation and fullscreen state.
- */
+/** Screen orientation and fullscreen state. */
 @Stable
 data class OrientationState(
     /** Currently in landscape orientation */
@@ -122,10 +94,7 @@ data class OrientationState(
     val shouldEnterFullscreen: Boolean = false
 )
 
-/**
- * Utility function to format duration (requires TimeFormatter import)
- */
+/** ✅ FIXED: Real TimeFormatter integration */
 private fun formatDuration(durationMs: Long): String {
-    // TimeFormatter.formatShortTime(durationMs)
-    return "0:00" // Placeholder - replace with actual formatter
+    return TimeFormatter.formatShortTime(durationMs)
 }

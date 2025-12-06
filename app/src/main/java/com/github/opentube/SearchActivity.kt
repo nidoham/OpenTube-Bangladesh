@@ -4,15 +4,13 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.*
+import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -24,24 +22,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
-import com.github.extractor.stream.StreamInfo
+import com.github.extractor.stream.StreamInfoItem as LocalStreamInfoItem
 import com.github.opentube.player.queue.PlayQueue
 import com.github.opentube.player.queue.PlayQueueItem
 import com.github.opentube.screens.items.VideoItemCard
@@ -50,12 +42,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.schabi.newpipe.extractor.Image
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.Page
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.search.SearchExtractor
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
+import java.util.Locale
 
 // Dark color scheme with pure black background
 private val DarkColorScheme = darkColorScheme(
@@ -95,21 +87,30 @@ class SearchActivity : ComponentActivity() {
 }
 
 class SearchViewModel : ViewModel() {
-    var searchQuery by mutableStateOf("")
-    var searchResults by mutableStateOf<List<StreamInfo>>(emptyList())
-    var searchSuggestions by mutableStateOf<List<String>>(emptyList())
 
-    // State for initial loading
+    var searchQuery by mutableStateOf("")
+        private set
+
+    // Search results use lightweight local StreamInfoItem (card data)
+    var searchResults by mutableStateOf<List<LocalStreamInfoItem>>(emptyList())
+        private set
+
+    var searchSuggestions by mutableStateOf<List<String>>(emptyList())
+        private set
+
     var isLoading by mutableStateOf(false)
-    // State for pagination loading
+        private set
+
     var isLoadingMore by mutableStateOf(false)
+        private set
 
     var showSuggestions by mutableStateOf(false)
+        private set
 
     private var suggestionJob: Job? = null
     private val serviceId = ServiceList.YouTube.serviceId
 
-    // Pagination variables
+    // Pagination
     private var currentExtractor: SearchExtractor? = null
     private var nextPageInfo: Page? = null
 
@@ -117,7 +118,6 @@ class SearchViewModel : ViewModel() {
         searchQuery = query
         showSuggestions = query.isNotBlank()
 
-        // Debounced suggestion fetching
         suggestionJob?.cancel()
         if (query.isNotBlank()) {
             suggestionJob = viewModelScope.launch {
@@ -134,7 +134,6 @@ class SearchViewModel : ViewModel() {
             try {
                 val extractor = NewPipe.getService(serviceId).suggestionExtractor
                 val suggestions = extractor.suggestionList(query)
-
                 withContext(Dispatchers.Main) {
                     searchSuggestions = suggestions.take(8)
                 }
@@ -155,7 +154,6 @@ class SearchViewModel : ViewModel() {
         isLoading = true
         searchResults = emptyList()
 
-        // Reset pagination state
         currentExtractor = null
         nextPageInfo = null
 
@@ -166,7 +164,6 @@ class SearchViewModel : ViewModel() {
                     val extractor = service.getSearchExtractor(query)
                     extractor.fetchPage()
 
-                    // Save extractor and next page info for pagination
                     currentExtractor = extractor
                     nextPageInfo = extractor.initialPage.nextPage
 
@@ -174,11 +171,11 @@ class SearchViewModel : ViewModel() {
 
                     items.filterIsInstance<StreamInfoItem>()
                         .map { item ->
-                            StreamInfo.from(item)
+                            LocalStreamInfoItem.from(item)
                         }
                 } catch (e: Exception) {
                     e.printStackTrace()
-                    emptyList<StreamInfo>()
+                    emptyList<LocalStreamInfoItem>()
                 }
             }
 
@@ -188,7 +185,6 @@ class SearchViewModel : ViewModel() {
     }
 
     fun loadNextPage() {
-        // Prevent multiple calls or calls when there are no more pages
         if (isLoadingMore || nextPageInfo == null || currentExtractor == null) return
 
         isLoadingMore = true
@@ -196,24 +192,20 @@ class SearchViewModel : ViewModel() {
         viewModelScope.launch {
             val newResults = withContext(Dispatchers.IO) {
                 try {
-                    // Fetch the next page using the stored info
                     val page = currentExtractor!!.getPage(nextPageInfo)
-
-                    // Update next page info for the subsequent call
                     nextPageInfo = page.nextPage
 
                     val items = page.items
                     items.filterIsInstance<StreamInfoItem>()
                         .map { item ->
-                            StreamInfo.from(item)
+                            LocalStreamInfoItem.from(item)
                         }
                 } catch (e: Exception) {
                     e.printStackTrace()
-                    emptyList<StreamInfo>()
+                    emptyList<LocalStreamInfoItem>()
                 }
             }
 
-            // Append new results to the existing list
             if (newResults.isNotEmpty()) {
                 searchResults = searchResults + newResults
             }
@@ -228,10 +220,12 @@ class SearchViewModel : ViewModel() {
         showSuggestions = false
         currentExtractor = null
         nextPageInfo = null
+        isLoading = false
+        isLoadingMore = false
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
 fun SearchScreen(
     onBackPressed: () -> Unit,
@@ -239,6 +233,7 @@ fun SearchScreen(
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
@@ -266,18 +261,17 @@ fun SearchScreen(
                 .background(Color.Black)
                 .padding(paddingValues)
         ) {
-            // Search Results
             if (viewModel.searchResults.isNotEmpty()) {
-                val context = LocalContext.current
                 SearchResultsList(
                     results = viewModel.searchResults,
                     isLoadingMore = viewModel.isLoadingMore,
                     onVideoClick = { stream ->
                         val item = PlayQueueItem(
-                            title = stream.title,
+                            title = stream.name,
                             channelName = stream.uploaderName,
                             thumbnailUrl = stream.thumbnails,
-                            videoUrl = stream.videoUrl
+                            videoUrl = stream.url,
+                            duration = stream.duration
                         )
 
                         val queue = PlayQueue.fromSingleItem(item)
@@ -293,7 +287,6 @@ fun SearchScreen(
                 )
             }
 
-            // Initial Loading Indicator
             if (viewModel.isLoading) {
                 CircularProgressIndicator(
                     modifier = Modifier.align(Alignment.Center),
@@ -301,12 +294,11 @@ fun SearchScreen(
                 )
             }
 
-            // Search Suggestions Overlay
             if (viewModel.showSuggestions && viewModel.searchSuggestions.isNotEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black)
+                        .background(Color.Black.copy(alpha = 0.9f))
                         .zIndex(1f)
                 ) {
                     SearchSuggestionsList(
@@ -470,9 +462,9 @@ fun SuggestionItem(
 
 @Composable
 fun SearchResultsList(
-    results: List<StreamInfo>,
+    results: List<LocalStreamInfoItem>,
     isLoadingMore: Boolean,
-    onVideoClick: (StreamInfo) -> Unit,
+    onVideoClick: (LocalStreamInfoItem) -> Unit,
     onLoadMore: () -> Unit
 ) {
     LazyColumn(
@@ -490,15 +482,13 @@ fun SearchResultsList(
                 onClick = { onVideoClick(video) }
             )
 
-            // Check if we reached the end of the list
             if (index == results.lastIndex && !isLoadingMore) {
-                LaunchedEffect(Unit) {
+                LaunchedEffect(key1 = index) {
                     onLoadMore()
                 }
             }
         }
 
-        // Loading indicator at the bottom
         if (isLoadingMore) {
             item {
                 Box(
@@ -524,17 +514,17 @@ fun formatDuration(seconds: Long): String {
     val secs = seconds % 60
 
     return if (hours > 0) {
-        String.format("%d:%02d:%02d", hours, minutes, secs)
+        String.format(Locale.getDefault(), "%d:%02d:%02d", hours, minutes, secs)
     } else {
-        String.format("%d:%02d", minutes, secs)
+        String.format(Locale.getDefault(), "%d:%02d", minutes, secs)
     }
 }
 
 fun formatViewCount(count: Long): String {
     return when {
-        count >= 1_000_000_000 -> String.format("%.1fB", count / 1_000_000_000.0)
-        count >= 1_000_000 -> String.format("%.1fM", count / 1_000_000.0)
-        count >= 1_000 -> String.format("%.1fK", count / 1_000.0)
+        count >= 1_000_000_000 -> String.format(Locale.getDefault(), "%.1fB", count / 1_000_000_000.0)
+        count >= 1_000_000 -> String.format(Locale.getDefault(), "%.1fM", count / 1_000_000.0)
+        count >= 1_000 -> String.format(Locale.getDefault(), "%.1fK", count / 1_000.0)
         else -> count.toString()
     }
 }

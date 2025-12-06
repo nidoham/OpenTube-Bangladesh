@@ -36,18 +36,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.github.extractor.stream.StreamInfo
+import com.github.extractor.stream.StreamInfoItem
 import com.github.opentube.formatDuration
 import com.github.opentube.formatViewCount
-import org.schabi.newpipe.extractor.Image
 
 @Composable
 fun VideoItemCard(
-    streamInfo: StreamInfo,
+    streamInfo: StreamInfoItem,
     onClick: () -> Unit
 ) {
-    val thumbnails: String = streamInfo.bestThumbnailUrl() ?: ""
-    val channelAvatars= streamInfo.bestUploaderAvatarUrl() ?: ""
+    val thumbnailUrl: String = streamInfo.thumbnails.firstOrNull()?.url ?: ""
+    val channelAvatarUrl: String = streamInfo.uploaderAvatars.firstOrNull()?.url ?: ""
 
     Card(
         modifier = Modifier
@@ -61,6 +60,7 @@ fun VideoItemCard(
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
+
             // Thumbnail with duration badge
             Box(
                 modifier = Modifier
@@ -69,7 +69,7 @@ fun VideoItemCard(
             ) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
-                        .data(thumbnails)
+                        .data(thumbnailUrl)
                         .crossfade(true)
                         .build(),
                     contentDescription = "Video thumbnail",
@@ -77,7 +77,6 @@ fun VideoItemCard(
                     contentScale = ContentScale.Crop
                 )
 
-                // Duration badge
                 if (streamInfo.duration > 0) {
                     Surface(
                         modifier = Modifier
@@ -103,10 +102,11 @@ fun VideoItemCard(
                     .fillMaxWidth()
                     .padding(12.dp)
             ) {
+
                 // Channel avatar
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
-                        .data(channelAvatars)
+                        .data(channelAvatarUrl)
                         .crossfade(true)
                         .build(),
                     contentDescription = "Channel avatar",
@@ -124,7 +124,7 @@ fun VideoItemCard(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(
-                        text = streamInfo.title,
+                        text = streamInfo.name,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         maxLines = 2,
@@ -145,17 +145,32 @@ fun VideoItemCard(
 
                     Spacer(modifier = Modifier.height(2.dp))
 
-                    Text(
-                        text = "${formatViewCount(streamInfo.viewCount)} views • ${streamInfo.uploadDate}",
-                        fontSize = 12.sp,
-                        color = Color(0xFFB3B3B3),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    val viewsText = if (streamInfo.viewCount >= 0) {
+                        "${formatViewCount(streamInfo.viewCount)} views"
+                    } else {
+                        ""
+                    }
+
+                    val dateText = streamInfo.textualUploadDate.ifBlank {
+                        streamInfo.uploadDate?: ""
+                    }
+
+                    val metaText = listOf(viewsText, dateText)
+                        .joinToString(" • ")
+
+                    if (metaText.isNotBlank()) {
+                        Text(
+                            text = metaText,
+                            fontSize = 12.sp,
+                            color = Color(0xFFB3B3B3),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
 
                 IconButton(
-                    onClick = { /* Show menu */ },
+                    onClick = { /* TODO: Show menu */ },
                     modifier = Modifier.size(24.dp)
                 ) {
                     Icon(

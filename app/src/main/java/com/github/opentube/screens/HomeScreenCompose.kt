@@ -3,7 +3,14 @@ package com.github.opentube.screens
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -13,13 +20,20 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.github.extractor.stream.StreamInfo
+import com.github.extractor.stream.StreamInfoItem as LocalStreamInfoItem
 import com.github.opentube.PlayerActivity
 import com.github.opentube.player.queue.PlayQueue
 import com.github.opentube.player.queue.PlayQueueItem
@@ -34,7 +48,7 @@ import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 
 data class FetchResult(
-    val videos: List<StreamInfo>,
+    val videos: List<LocalStreamInfoItem>,
     val nextPage: Page?
 )
 
@@ -44,7 +58,7 @@ fun HomeScreenCompose() {
     val categories = listOf("All", "Gaming", "Sports", "Music", "News", "Coding")
     var selectedCategory by remember { mutableStateOf("All") }
 
-    var videoList by remember { mutableStateOf<List<StreamInfo>>(emptyList()) }
+    var videoList by remember { mutableStateOf<List<LocalStreamInfoItem>>(emptyList()) }
     var nextPageToken by remember { mutableStateOf<Page?>(null) }
 
     var isInitialLoading by remember { mutableStateOf(false) }
@@ -58,16 +72,20 @@ fun HomeScreenCompose() {
         if (isAppend && page == null) return
 
         scope.launch {
-            if (isAppend) isAppendLoading = true else isInitialLoading = true
+            if (isAppend) {
+                isAppendLoading = true
+            } else {
+                isInitialLoading = true
+            }
             errorMessage = null
 
             try {
                 val result = fetchVideos(category, page)
 
-                if (isAppend) {
-                    videoList = videoList + result.videos
+                videoList = if (isAppend) {
+                    videoList + result.videos
                 } else {
-                    videoList = result.videos
+                    result.videos
                 }
                 nextPageToken = result.nextPage
             } catch (e: Exception) {
@@ -104,7 +122,12 @@ fun HomeScreenCompose() {
                 FilterChip(
                     selected = isSelected,
                     onClick = { selectedCategory = category },
-                    label = { Text(text = category, color = if (isSelected) Color.Black else Color.White) },
+                    label = {
+                        Text(
+                            text = category,
+                            color = if (isSelected) Color.Black else Color.White
+                        )
+                    },
                     shape = RoundedCornerShape(50),
                     colors = FilterChipDefaults.filterChipColors(
                         containerColor = if (isSelected) Color.White else Color(0xFF272727),
@@ -116,51 +139,76 @@ fun HomeScreenCompose() {
         }
 
         Box(modifier = Modifier.fillMaxSize()) {
-            if (isInitialLoading) {
-                CircularProgressIndicator(color = Color.White, modifier = Modifier.align(Alignment.Center))
-            } else if (errorMessage != null && videoList.isEmpty()) {
-                Text(
-                    text = "Error: $errorMessage",
-                    color = Color.Red,
-                    modifier = Modifier.align(Alignment.Center).padding(16.dp)
-                )
-            } else {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    items(videoList) { stream ->
-                        VideoRecommendationItem(
-                            streamInfo = stream,
-                            onVideoClick = {
-                                val item = PlayQueueItem(
-                                    title = stream.title,
-                                    channelName = stream.uploaderName,
-                                    thumbnailUrl = stream.thumbnails,
-                                    videoUrl = stream.videoUrl
-                                )
+            when {
+                isInitialLoading -> {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
 
-                                val queue = PlayQueue.fromSingleItem(item)
+                errorMessage != null && videoList.isEmpty() -> {
+                    Text(
+                        text = "Error: $errorMessage",
+                        color = Color.Red,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(16.dp)
+                    )
+                }
 
-                                val intent = Intent(context, PlayerActivity::class.java).apply {
-                                    putExtra("play_queue", queue)
+                else -> {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(videoList) { stream ->
+                            VideoRecommendationItem(
+                                streamInfo = stream,
+                                onVideoClick = {
+                                    val item = PlayQueueItem(
+                                        title = stream.name,
+                                        channelName = stream.uploaderName,
+                                        thumbnailUrl = stream.thumbnails,
+                                        videoUrl = stream.url,
+                                        duration = stream.duration
+                                    )
+
+                                    val queue = PlayQueue.fromSingleItem(item)
+
+                                    val intent = Intent(context, PlayerActivity::class.java).apply {
+                                        putExtra("play_queue", queue)
+                                    }
+                                    context.startActivity(intent)
                                 }
-                                context.startActivity(intent)
-                            }
-                        )
-                    }
+                            )
+                        }
 
-                    if (nextPageToken != null || isAppendLoading) {
-                        item {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (isAppendLoading) {
-                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(32.dp))
-                                } else {
-                                    SideEffect { loadData(selectedCategory, nextPageToken, isAppend = true) }
+                        if (nextPageToken != null || isAppendLoading) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isAppendLoading) {
+                                        CircularProgressIndicator(
+                                            color = Color.White,
+                                            modifier = Modifier.size(32.dp)
+                                        )
+                                    } else {
+                                        SideEffect {
+                                            loadData(
+                                                selectedCategory,
+                                                nextPageToken,
+                                                isAppend = true
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -179,37 +227,44 @@ fun formatViews(views: Long): String {
     }
 }
 
-suspend fun fetchVideos(category: String, page: Page?): FetchResult = withContext(Dispatchers.IO) {
-    val service = ServiceList.YouTube
+suspend fun fetchVideos(category: String, page: Page?): FetchResult =
+    withContext(Dispatchers.IO) {
+        val service = ServiceList.YouTube
 
-    try {
-        val extractor: ListExtractor<*> = if (category == "All" || category == "Explore") {
-            val kioskList = service.kioskList
-            val kioskId = kioskList.defaultKioskId ?: "Trending"
-            kioskList.getExtractorById(kioskId, null)
-        } else {
-            service.getSearchExtractor(category)
-        }
-
-        if (page == null) {
-            extractor.fetchPage()
-        }
-
-        val resultPage = if (page == null) extractor.initialPage else extractor.getPage(page)
-
-        val mappedVideos = resultPage.items
-            .filterIsInstance<StreamInfoItem>()
-            .map { item ->
-                val thumbList: List<Image> = item.thumbnails ?: emptyList()
-                val avatarList: List<Image> = item.uploaderAvatars ?: emptyList()
-
-                StreamInfo.from(item)
+        try {
+            val extractor: ListExtractor<*> = if (category == "All" || category == "Explore") {
+                val kioskList = service.kioskList
+                val kioskId = kioskList.defaultKioskId ?: "Trending"
+                kioskList.getExtractorById(kioskId, null)
+            } else {
+                service.getSearchExtractor(category)
             }
 
-        return@withContext FetchResult(mappedVideos, resultPage.nextPage)
+            if (page == null) {
+                extractor.fetchPage()
+            }
 
-    } catch (e: Exception) {
-        e.printStackTrace()
-        throw e
+            val resultPage = if (page == null) {
+                extractor.initialPage
+            } else {
+                extractor.getPage(page)
+            }
+
+            val mappedVideos = resultPage.items
+                .filterIsInstance<StreamInfoItem>()
+                .map { item ->
+                    val thumbList: List<Image> = item.thumbnails ?: emptyList()
+                    val avatarList: List<Image> = item.uploaderAvatars ?: emptyList()
+
+                    LocalStreamInfoItem.from(item).copy(
+                        thumbnails = thumbList,
+                        uploaderAvatars = avatarList
+                    )
+                }
+
+            FetchResult(mappedVideos, resultPage.nextPage)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            throw e
+        }
     }
-}

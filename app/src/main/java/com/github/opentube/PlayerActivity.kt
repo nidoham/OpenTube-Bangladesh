@@ -1,6 +1,7 @@
 package com.github.opentube
 
 import android.app.Activity
+import android.app.Application
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.os.Build
@@ -9,6 +10,9 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.annotation.RequiresApi
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -37,16 +41,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.ui.PlayerView
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
+import com.github.extractor.stream.VideoMetadata
 import com.github.opentube.player.PlayerHelper
 import com.github.opentube.player.controller.PlayerController
 import com.github.opentube.player.gesture.GestureHandler
 import com.github.opentube.player.manager.ControlsManager
 import com.github.opentube.player.queue.PlayQueue
+import com.github.opentube.player.state.ControlsState
+import com.github.opentube.player.state.PlayerState
 import com.github.opentube.player.util.TimeFormatter
+import kotlinx.coroutines.delay
 
 class PlayerActivity : ComponentActivity() {
 
@@ -69,28 +78,24 @@ class PlayerActivity : ComponentActivity() {
             }
         }
     }
-
-    override fun onStart() {
-        super.onStart()
-        Log.d(TAG, "Activity onStart called")
-    }
 }
 
 @Composable
 fun PlayerScreen() {
     val context = LocalContext.current
+    val application = context.applicationContext as Application
 
     val playerController: PlayerController = viewModel(
-        factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+        factory = object : ViewModelProvider.Factory {
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
-                return PlayerController(context) as T
+                return PlayerController(application) as T
             }
         }
     )
 
     val controlsManager: ControlsManager = viewModel(
-        factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+        factory = object : ViewModelProvider.Factory {
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
                 return ControlsManager(context) as T
@@ -99,8 +104,6 @@ fun PlayerScreen() {
     )
 
     val playerState by playerController.playerState
-    val videoMetadata by playerController.videoMetadata
-    val controlsState by controlsManager.controlsState
 
     Box(
         modifier = Modifier
@@ -204,7 +207,7 @@ fun VideoPlayerContent(
 
     LaunchedEffect(controlsState.showControls, playerState.isPlaying) {
         if (controlsState.showControls && playerState.isPlaying) {
-            kotlinx.coroutines.delay(3000)
+            delay(3000)
             controlsManager.hideControls()
         }
     }
@@ -228,7 +231,6 @@ fun VideoPlayerContent(
             GestureLayer(
                 gestureHandler = gestureHandler,
                 controlsManager = controlsManager,
-                playerController = playerController,
                 playerState = playerState
             )
 
@@ -268,9 +270,9 @@ fun VideoPlayerContent(
 
 @Composable
 fun PlayerView(playerController: PlayerController) {
-    val mediaController = playerController.mediaController
+    val mediaController = remember { playerController._mediaController }
 
-    key(mediaController) {
+    if (mediaController != null) {
         AndroidView(
             factory = { ctx ->
                 PlayerView(ctx).apply {
@@ -293,8 +295,7 @@ fun PlayerView(playerController: PlayerController) {
 fun GestureLayer(
     gestureHandler: GestureHandler,
     controlsManager: ControlsManager,
-    playerController: PlayerController,
-    playerState: com.github.opentube.player.state.PlayerState
+    playerState: PlayerState
 ) {
     Box(
         modifier = Modifier
@@ -354,8 +355,8 @@ fun GestureLayer(
 
 @Composable
 fun OverlaysLayer(
-    controlsState: com.github.opentube.player.state.ControlsState,
-    playerState: com.github.opentube.player.state.PlayerState
+    controlsState: ControlsState,
+    playerState: PlayerState
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         if (controlsState.showSeekOverlay) {
@@ -416,16 +417,16 @@ fun ControlsLayer(
     visible: Boolean,
     playerController: PlayerController,
     controlsManager: ControlsManager,
-    playerState: com.github.opentube.player.state.PlayerState,
-    videoMetadata: com.github.opentube.player.state.VideoMetadata,
-    controlsState: com.github.opentube.player.state.ControlsState,
+    playerState: PlayerState,
+    videoMetadata: VideoMetadata,
+    controlsState: ControlsState,
     isLandscape: Boolean,
     activity: Activity?
 ) {
-    androidx.compose.animation.AnimatedVisibility(
+    AnimatedVisibility(
         visible = visible,
-        enter = androidx.compose.animation.fadeIn(),
-        exit = androidx.compose.animation.fadeOut(),
+        enter = fadeIn(),
+        exit = fadeOut(),
         modifier = Modifier.fillMaxSize()
     ) {
         Box(
@@ -439,7 +440,7 @@ fun ControlsLayer(
         ) {
             Box(modifier = Modifier.align(Alignment.TopCenter)) {
                 TopControls(
-                    videoTitle = videoMetadata.title,
+                    videoTitle = videoMetadata.name,
                     quality = controlsState.quality,
                     isLandscape = isLandscape,
                     onBack = { activity?.finish() },
@@ -647,7 +648,9 @@ fun YouTubeProgressBar(
     var sliderValue by remember { mutableFloatStateOf(0f) }
     var isDragging by remember { mutableStateOf(false) }
 
-    if (!isDragging) sliderValue = externalValue
+    if (!isDragging) {
+        sliderValue = externalValue.coerceIn(0f, 1f)
+    }
 
     Box(
         modifier = Modifier
@@ -669,16 +672,9 @@ fun YouTubeProgressBar(
 
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(bufferedPercentage / 100f)
+                    .fillMaxWidth((bufferedPercentage / 100f).coerceIn(0f, 1f))
                     .height(4.dp)
                     .background(Color(0x66FFFFFF), RoundedCornerShape(2.dp))
-            )
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(sliderValue)
-                    .height(4.dp)
-                    .background(Color(0xFFFF0000), RoundedCornerShape(2.dp))
             )
         }
 
@@ -699,7 +695,7 @@ fun YouTubeProgressBar(
                 .height(40.dp),
             colors = SliderDefaults.colors(
                 thumbColor = Color.Transparent,
-                activeTrackColor = Color.Transparent,
+                activeTrackColor = Color(0xFFFF0000),
                 inactiveTrackColor = Color.Transparent
             ),
             thumb = {
@@ -774,7 +770,7 @@ fun QualityDialog(
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             )
-            Divider(
+            HorizontalDivider(
                 color = Color.Gray.copy(alpha = 0.3f),
                 modifier = Modifier.padding(vertical = 12.dp)
             )
@@ -803,7 +799,7 @@ fun QualityDialog(
 
 @Composable
 fun VideoMetadataSection(
-    videoMetadata: com.github.opentube.player.state.VideoMetadata,
+    videoMetadata: VideoMetadata,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -815,7 +811,7 @@ fun VideoMetadataSection(
             .padding(12.dp)
     ) {
         Text(
-            text = videoMetadata.title,
+            text = videoMetadata.name,
             color = Color.White,
             fontSize = 18.sp,
             fontWeight = FontWeight.SemiBold,
@@ -825,9 +821,12 @@ fun VideoMetadataSection(
         Spacer(modifier = Modifier.height(8.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically) {
+            // Fixed: Use uploaderAvatarUrl (String?) instead of uploaderAvatars (List<Image>)
+            val avatarUrl = videoMetadata.uploaderAvatarUrl
+
             SubcomposeAsyncImage(
                 model = ImageRequest.Builder(context)
-                    .data(videoMetadata.channelAvatar.ifEmpty { null })
+                    .data(avatarUrl)
                     .crossfade(true)
                     .build(),
                 contentDescription = "Channel Avatar",
@@ -871,14 +870,14 @@ fun VideoMetadataSection(
 
             Column {
                 Text(
-                    text = videoMetadata.channelName,
+                    text = videoMetadata.uploaderName,
                     color = Color.White,
                     fontWeight = FontWeight.Medium,
                     fontSize = 14.sp
                 )
-                if (videoMetadata.subscriberCount.isNotEmpty()) {
+                if (videoMetadata.uploaderSubscriberCount >= 0) {
                     Text(
-                        text = videoMetadata.subscriberCount,
+                        text = formatSubscriberCount(videoMetadata.uploaderSubscriberCount),
                         color = Color.Gray,
                         fontSize = 12.sp
                     )
@@ -898,6 +897,15 @@ fun VideoMetadataSection(
             ActionButton(Icons.Default.Download, "Download")
             ActionButton(Icons.Default.PlaylistAdd, "Save")
         }
+    }
+}
+
+// Helper function to format subscriber count
+private fun formatSubscriberCount(count: Long): String {
+    return when {
+        count >= 1_000_000 -> String.format("%.1fM subscribers", count / 1_000_000.0)
+        count >= 1_000 -> String.format("%.1fK subscribers", count / 1_000.0)
+        else -> "$count subscribers"
     }
 }
 

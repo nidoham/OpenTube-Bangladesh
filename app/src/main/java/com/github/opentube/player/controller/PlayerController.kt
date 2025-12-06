@@ -1,79 +1,92 @@
 package com.github.opentube.player.controller
 
+import android.app.Application
 import android.content.ComponentName
-import android.content.Context
+import android.os.Build
+import android.os.Bundle
 import android.util.Log
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
-import androidx.lifecycle.ViewModel
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import com.github.extractor.stream.VideoMetadata
 import com.github.opentube.player.PlayerService
 import com.github.opentube.player.state.PlayerState
-import com.github.opentube.player.state.VideoMetadata
 import com.google.common.util.concurrent.ListenableFuture
-import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.io.Serializable
 
-/**
- * Manages Media3 MediaController connection and player state for Jetpack Compose UI.
- * Handles connection, playback control, metadata updates, and position tracking.
- */
-class PlayerController(private val context: Context) : ViewModel() {
+class PlayerController(application: Application) : AndroidViewModel(application) {
 
     private val _playerState = mutableStateOf(PlayerState())
     val playerState: State<PlayerState> = _playerState
 
-    private val _videoMetadata = mutableStateOf(VideoMetadata())
+    private val _videoMetadata = mutableStateOf(
+        VideoMetadata(
+            name = "Loading...",
+            thumbnailUrl = null,
+            uploaderName = "",
+            uploaderAvatarUrl = null,
+            uploaderSubscriberCount = -1L,
+            viewCount = -1L,
+            uploadDate = null
+        )
+    )
     val videoMetadata: State<VideoMetadata> = _videoMetadata
 
     private var controllerFuture: ListenableFuture<MediaController>? = null
-    private var _mediaController: MediaController? = null
-    val mediaController: MediaController? get() = _mediaController
+    var _mediaController: MediaController? = null
     private var positionUpdateJob: Job? = null
 
     companion object {
         private const val TAG = "PlayerController"
-        private const val POSITION_UPDATE_INTERVAL = 100L // Reduced for better perf
+        private const val POSITION_UPDATE_INTERVAL = 100L
     }
 
     init {
         initializeController()
     }
 
-    /**
-     * Initializes MediaController connection to PlayerService.
-     */
     fun initializeController() {
-        Log.d(TAG, "Initializing media controller")
+        Log.d(TAG, "Initializing controller")
         updatePlayerState { it.copy(isConnecting = true, hasError = false) }
 
-        val sessionToken = SessionToken(context, ComponentName(context, PlayerService::class.java))
+        val context = getApplication<Application>()
+        val sessionToken = SessionToken(
+            context,
+            ComponentName(context, PlayerService::class.java)
+        )
         controllerFuture = MediaController.Builder(context, sessionToken).buildAsync()
 
         controllerFuture?.addListener({
-            val controller = runCatching { controllerFuture?.get() }
-                .getOrNull()
-
-            if (controller != null) {
-                onControllerConnected(controller)
-            } else {
-                onConnectionError("MediaController is null")
+            try {
+                val controller = controllerFuture?.get()
+                if (controller != null) {
+                    onControllerConnected(controller)
+                } else {
+                    Log.e(TAG, "Controller is null after future completed")
+                    updatePlayerState { it.copy(isConnecting = false, hasError = true) }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error connecting to controller", e)
+                updatePlayerState { it.copy(isConnecting = false, hasError = true) }
             }
-        }, MoreExecutors.directExecutor())
+        }, ContextCompat.getMainExecutor(context))
     }
 
     private fun onControllerConnected(controller: MediaController) {
-        Log.d(TAG, "MediaController connected successfully")
+        Log.d(TAG, "Controller connected successfully")
         _mediaController = controller
         setupPlayerListener(controller)
         updateMetadataFromPlayer(controller)
+        startPositionUpdates()
 
         updatePlayerState { state ->
             state.copy(
@@ -82,78 +95,110 @@ class PlayerController(private val context: Context) : ViewModel() {
                 isPlaying = controller.isPlaying,
                 currentPosition = controller.currentPosition,
                 duration = controller.duration.coerceAtLeast(0L),
-                bufferedPercentage = controller.bufferedPercentage,
-                volume = controller.volume
+                bufferedPercentage = controller.bufferedPercentage
             )
         }
-        startPositionUpdates()
     }
 
-    private fun onConnectionError(error: String) {
-        Log.e(TAG, error)
-        updatePlayerState { it.copy(isConnecting = false, hasError = true) }
-    }
-
-    /**
-     * Sets up Media3 Player.Listener for real-time state updates.
-     */
     private fun setupPlayerListener(player: Player) {
         player.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
+                Log.d(TAG, "onIsPlayingChanged: $isPlaying")
                 updatePlayerState { it.copy(isPlaying = isPlaying) }
             }
 
             override fun onEvents(player: Player, events: Player.Events) {
                 if (events.contains(Player.EVENT_MEDIA_METADATA_CHANGED) ||
-                    events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION) ||
-                    events.contains(Player.EVENT_POSITION_DISCONTINUITY)) {
+                    events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION)
+                ) {
+                    Log.d(TAG, "Media metadata or item changed")
                     updateMetadataFromPlayer(player)
-                    updatePlayerState {
-                        it.copy(duration = player.duration.coerceAtLeast(0L))
-                    }
+                }
+
+                if (events.contains(Player.EVENT_PLAYBACK_STATE_CHANGED)) {
+                    Log.d(TAG, "Playback state: ${player.playbackState}")
                 }
             }
         })
     }
 
-    /**
-     * Extracts and parses video metadata from Media3 MediaMetadata.
-     */
     private fun updateMetadataFromPlayer(player: Player) {
-        val metadata = player.currentMediaItem?.mediaMetadata ?: return
+        val mediaItem = player.currentMediaItem
+        if (mediaItem == null) {
+            Log.w(TAG, "No current media item")
+            return
+        }
 
-        val title = metadata.title?.toString() ?: "Unknown Title"
-        val channelName = metadata.artist?.toString() ?: "Unknown Channel"
-        val thumbnailUrl = metadata.artworkUri?.toString().orEmpty()
+        val metadata = mediaItem.mediaMetadata
+        val extras = metadata.extras
 
-        val descriptionParts = (metadata.description?.toString() ?: "")
-            .split("|")
-            .map { it.trim() }
+        if (extras == null) {
+            Log.w(TAG, "No extras in media metadata")
+            setFallbackMetadata(metadata)
+            return
+        }
 
-        _videoMetadata.value = VideoMetadata(
-            title = title,
-            channelName = channelName,
-            thumbnailUrl = thumbnailUrl,
-            viewCount = descriptionParts.getOrNull(0).orEmpty(),
-            uploadTime = descriptionParts.getOrNull(1).orEmpty(),
-            subscriberCount = descriptionParts.getOrNull(2).orEmpty(),
-            channelAvatar = descriptionParts.getOrNull(3).orEmpty()
-        )
+        // Set ClassLoader to avoid ClassNotFoundException
+        extras.classLoader = VideoMetadata::class.java.classLoader
 
-        Log.d(TAG, "Metadata updated: $title by $channelName")
+        try {
+            val receivedMetadata = getSerializableCompat(
+                extras,
+                PlayerService.EXTRA_METADATA_OBJECT,
+                VideoMetadata::class.java
+            )
+
+            if (receivedMetadata != null) {
+                _videoMetadata.value = receivedMetadata
+                Log.d(TAG, "Successfully received VideoMetadata: ${receivedMetadata.name}")
+            } else {
+                Log.w(TAG, "VideoMetadata is null, using fallback")
+                setFallbackMetadata(metadata)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error extracting VideoMetadata", e)
+            setFallbackMetadata(metadata)
+        }
     }
 
-    /**
-     * Starts continuous position tracking coroutine.
-     */
+    private fun setFallbackMetadata(metadata: androidx.media3.common.MediaMetadata) {
+        _videoMetadata.value = VideoMetadata(
+            name = metadata.title?.toString() ?: "Unknown",
+            thumbnailUrl = metadata.artworkUri?.toString(),
+            uploaderName = metadata.artist?.toString() ?: "",
+            uploaderAvatarUrl = null,
+            uploaderSubscriberCount = -1L,
+            viewCount = -1L,
+            uploadDate = metadata.description?.toString()
+        )
+    }
+
+    private fun <T : Serializable> getSerializableCompat(
+        bundle: Bundle,
+        key: String,
+        clazz: Class<T>
+    ): T? {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                bundle.getSerializable(key, clazz)
+            } else {
+                @Suppress("DEPRECATION")
+                bundle.getSerializable(key) as? T
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting serializable from bundle", e)
+            null
+        }
+    }
+
     private fun startPositionUpdates() {
         positionUpdateJob?.cancel()
         positionUpdateJob = viewModelScope.launch {
             while (isActive) {
                 _mediaController?.let { controller ->
                     if (controller.isPlaying) {
-                        updatePlayerState { state ->
-                            state.copy(
+                        updatePlayerState {
+                            it.copy(
                                 currentPosition = controller.currentPosition,
                                 duration = controller.duration.coerceAtLeast(0L),
                                 bufferedPercentage = controller.bufferedPercentage
@@ -166,72 +211,66 @@ class PlayerController(private val context: Context) : ViewModel() {
         }
     }
 
-    /**
-     * Safely updates player state with current state transformation.
-     */
     private inline fun updatePlayerState(transform: (PlayerState) -> PlayerState) {
         _playerState.value = transform(_playerState.value)
     }
 
-    // Public playback controls
-    fun play() = _mediaController?.play()
-    fun pause() = _mediaController?.pause()
+    fun play() {
+        _mediaController?.play()
+        Log.d(TAG, "Play called")
+    }
+
+    fun pause() {
+        _mediaController?.pause()
+        Log.d(TAG, "Pause called")
+    }
 
     fun togglePlayPause() {
-        _mediaController?.let {
-            if (it.isPlaying) pause() else play()
+        if (_mediaController?.isPlaying == true) {
+            pause()
+        } else {
+            play()
         }
     }
 
     fun seekTo(position: Long) {
         _mediaController?.seekTo(position)
-        updatePlayerState { it.copy(currentPosition = position.coerceAtLeast(0L)) }
+        updatePlayerState { it.copy(currentPosition = position) }
+        Log.d(TAG, "Seek to: $position")
+    }
+
+    fun seekToNext() {
+        if (_mediaController?.hasNextMediaItem() == true) {
+            _mediaController?.seekToNextMediaItem()
+            Log.d(TAG, "Seeking to next media item")
+        }
     }
 
     fun seekToPrevious() {
-        _mediaController?.let {
-            if (it.hasPreviousMediaItem()) {
-                it.seekToPreviousMediaItem()
+        val controller = _mediaController
+        if (controller != null) {
+            if (controller.currentPosition > 3000) {
+                // If more than 3 seconds into the track, restart it
+                seekTo(0)
+            } else if (controller.hasPreviousMediaItem()) {
+                controller.seekToPreviousMediaItem()
+                Log.d(TAG, "Seeking to previous media item")
             } else {
                 seekTo(0)
             }
         }
     }
 
-    fun seekToNext() {
-        _mediaController?.let {
-            if (it.hasNextMediaItem()) {
-                it.seekToNextMediaItem()
-            }
-        }
-    }
-
     fun setVolume(volume: Float) {
-        val clamped = volume.coerceIn(0f, 1f)
-        _mediaController?.volume = clamped
-        updatePlayerState { it.copy(volume = clamped) }
-    }
-
-    /**
-     * Properly releases MediaController and cleans up resources.
-     */
-    fun releaseController() {
-        positionUpdateJob?.cancel()
-        controllerFuture?.let { future ->
-            runCatching {
-                MediaController.releaseFuture(future)
-            }.onFailure { e ->
-                Log.e(TAG, "Error releasing controller", e)
-            }
-        }
-        controllerFuture = null
-        _mediaController = null
-        _playerState.value = PlayerState()
-        Log.d(TAG, "PlayerController released")
+        _mediaController?.volume = volume.coerceIn(0f, 1f)
+        Log.d(TAG, "Volume set to: $volume")
     }
 
     override fun onCleared() {
+        Log.d(TAG, "PlayerController cleared")
+        positionUpdateJob?.cancel()
+        controllerFuture?.let { MediaController.releaseFuture(it) }
+        _mediaController = null
         super.onCleared()
-        releaseController()
     }
 }
